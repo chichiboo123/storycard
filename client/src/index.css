@@ -1,0 +1,167 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 20 14.3% 4.1%;
+  --muted: 60 4.8% 95.9%;
+  --muted-foreground: 25 5.3% 44.7%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 20 14.3% 4.1%;
+  --card: 0 0% 100%;
+  --card-foreground: 20 14.3% 4.1%;
+  --border: 20 5.9% 90%;
+  --input: 20 5.9% 90%;
+  --primary: 207 90% 54%;
+  --primary-foreground: 211 100% 99%;
+  --secondary: 60 4.8% 95.9%;
+  --secondary-foreground: 24 9.8% 10%;
+  --accent: 60 4.8% 95.9%;
+  --accent-foreground: 24 9.8% 10%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 60 9.1% 97.8%;
+  --ring: 20 14.3% 4.1%;
+  --radius: 0.5rem;
+  
+  /* Little Prince theme colors */
+  --pastel-sky: 199 94% 83%; /* #AEEAF7 */
+  --pastel-green: 115 58% 83%; /* #C4F0B5 */
+  --pastel-yellow: 54 100% 85%; /* #FFF6B7 */
+  --pastel-purple: 266 46% 89%; /* #E1D5F0 */
+}
+
+.dark {
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+  --muted: 240 3.7% 15.9%;
+  --muted-foreground: 240 5% 64.9%;
+  --popover: 240 10% 3.9%;
+  --popover-foreground: 0 0% 98%;
+  --card: 240 10% 3.9%;
+  --card-foreground: 0 0% 98%;
+  --border: 240 3.7% 15.9%;
+  --input: 240 3.7% 15.9%;
+  --primary: 207 90% 54%;
+  --primary-foreground: 211 100% 99%;
+  --secondary: 240 3.7% 15.9%;
+  --secondary-foreground: 0 0% 98%;
+  --accent: 240 3.7% 15.9%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 240 4.9% 83.9%;
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+
+  .font-do-hyeon {
+    font-family: 'Do Hyeon', sans-serif;
+  }
+
+  .font-noto {
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+}
+
+@layer utilities {
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  
+  .transform-style-preserve-3d {
+    transform-style: preserve-3d;
+  }
+  
+  .backface-hidden {
+    backface-visibility: hidden;
+  }
+  
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
+}
+
+.card-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+.card-item:hover .card-inner:not(.flipped) {
+  transform: rotateY(5deg) rotateX(5deg);
+}
+
+.bg-pastel-sky {
+  background-color: hsl(var(--pastel-sky));
+}
+
+.bg-pastel-green {
+  background-color: hsl(var(--pastel-green));
+}
+
+.bg-pastel-yellow {
+  background-color: hsl(var(--pastel-yellow));
+}
+
+.bg-pastel-purple {
+  background-color: hsl(var(--pastel-purple));
+}
+
+.text-pastel-sky {
+  color: hsl(var(--pastel-sky));
+}
+
+.text-pastel-green {
+  color: hsl(var(--pastel-green));
+}
+
+.text-pastel-yellow {
+  color: hsl(var(--pastel-yellow));
+}
+
+.text-pastel-purple {
+  color: hsl(var(--pastel-purple));
+}
+
+.from-pastel-sky {
+  --tw-gradient-from: hsl(var(--pastel-sky)) var(--tw-gradient-from-position);
+  --tw-gradient-to: hsl(var(--pastel-sky) / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+.to-pastel-purple {
+  --tw-gradient-to: hsl(var(--pastel-purple)) var(--tw-gradient-to-position);
+}
+
+.from-pastel-green {
+  --tw-gradient-from: hsl(var(--pastel-green)) var(--tw-gradient-from-position);
+  --tw-gradient-to: hsl(var(--pastel-green) / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+.to-pastel-yellow {
+  --tw-gradient-to: hsl(var(--pastel-yellow)) var(--tw-gradient-to-position);
+}
+
+.from-pastel-purple {
+  --tw-gradient-from: hsl(var(--pastel-purple)) var(--tw-gradient-from-position);
+  --tw-gradient-to: hsl(var(--pastel-purple) / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+.to-pastel-sky {
+  --tw-gradient-to: hsl(var(--pastel-sky)) var(--tw-gradient-to-position);
+}
+
+.via-pastel-yellow {
+  --tw-gradient-to: hsl(var(--pastel-yellow) / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), hsl(var(--pastel-yellow)) var(--tw-gradient-via-position), var(--tw-gradient-to);
+}
