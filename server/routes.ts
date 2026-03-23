@@ -163,10 +163,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Collect files to push
       const root = process.cwd();
-      const filesToPush: { path: string; content: string }[] = [];
+      const textFilesToPush: { path: string; content: Buffer }[] = [];
+      const binaryFilesToPush: { path: string; content: Buffer }[] = [];
 
-      const allowedExtensions = [".ts", ".tsx", ".js", ".jsx", ".json", ".css", ".html", ".md"];
-      const skipDirs = new Set(["node_modules", ".git", "dist", ".local", "attached_assets", "storytelling-cards-app.zip", ".cache"]);
+      const textExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".json", ".css", ".html", ".md", ".yml", ".yaml", ".txt", ".gitignore"]);
+      const binaryExtensions = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".ico", ".woff", ".woff2"]);
+      const skipDirs = new Set(["node_modules", ".git", "dist", ".local", "attached_assets", "storytelling-cards-app.zip", ".cache", ".github"]);
 
       function collectFiles(dir: string, base: string) {
         let entries: fs.Dirent[];
@@ -178,40 +180,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (entry.isDirectory()) {
             collectFiles(fullPath, relPath);
           } else {
-            const ext = path.extname(entry.name);
-            if (allowedExtensions.includes(ext) || entry.name === ".gitignore" || entry.name === "Dockerfile") {
-              try {
-                const content = fs.readFileSync(fullPath, "utf-8");
-                filesToPush.push({ path: relPath, content });
-              } catch { /* skip unreadable files */ }
-            }
+            const ext = path.extname(entry.name).toLowerCase();
+            const isSpecial = entry.name === ".gitignore" || entry.name === "Dockerfile";
+            try {
+              if (textExtensions.has(ext) || isSpecial) {
+                textFilesToPush.push({ path: relPath, content: fs.readFileSync(fullPath) });
+              } else if (binaryExtensions.has(ext)) {
+                const stat = fs.statSync(fullPath);
+                // Only include binary files under 600KB (proxy body size limit)
+                if (stat.size < 600 * 1024) {
+                  binaryFilesToPush.push({ path: relPath, content: fs.readFileSync(fullPath) });
+                }
+              }
+            } catch { /* skip unreadable files */ }
           }
         }
       }
 
       collectFiles(root, "");
 
-      // Get current commit SHA from main branch
+      const allFiles = [...textFilesToPush, ...binaryFilesToPush];
+
+      // Get current commit SHA from main branch (for parent and base_tree)
       let parentSha: string | undefined;
-      let treeSha: string | undefined;
+      let baseTreeSha: string | undefined;
       const branchRes = await connectors.proxy("github", `/repos/${owner}/${repoName}/git/ref/heads/main`, { method: "GET" });
       if (branchRes.status === 200) {
         const branch = await branchRes.json() as { object: { sha: string } };
         parentSha = branch.object.sha;
+        // Get the tree SHA from the current HEAD commit
         const commitRes = await connectors.proxy("github", `/repos/${owner}/${repoName}/git/commits/${parentSha}`, { method: "GET" });
-        const commit = await commitRes.json() as { tree: { sha: string } };
-        treeSha = commit.tree.sha;
+        if (commitRes.status === 200) {
+          const commit = await commitRes.json() as { tree: { sha: string } };
+          baseTreeSha = commit.tree.sha;
+        }
       }
 
       // Create blobs for each file
       const treeItems: { path: string; mode: string; type: string; sha: string }[] = [];
-      for (const file of filesToPush) {
+      for (const file of allFiles) {
+        const base64Content = file.content.toString("base64");
         const blobRes = await connectors.proxy("github", `/repos/${owner}/${repoName}/git/blobs`, {
           method: "POST",
-          body: JSON.stringify({ content: Buffer.from(file.content).toString("base64"), encoding: "base64" }),
+          body: JSON.stringify({ content: base64Content, encoding: "base64" }),
           headers: { "Content-Type": "application/json" },
         });
-        const blob = await blobRes.json() as { sha?: string; message?: string };
+        const blobText = await blobRes.text();
+        let blob: { sha?: string; message?: string };
+        try { blob = JSON.parse(blobText); } catch { blob = { message: blobText.substring(0, 100) }; }
         if (blobRes.status !== 201 || !blob.sha) {
           console.error("Blob creation failed:", blobRes.status, blob, "file:", file.path);
           return res.status(500).json({ error: "Failed to create blob", file: file.path, details: blob });
@@ -219,15 +235,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         treeItems.push({ path: file.path, mode: "100644", type: "blob", sha: blob.sha });
       }
 
-      // Create tree (on top of existing tree if any)
-      const treeBody: Record<string, unknown> = { tree: treeItems };
-      if (treeSha) treeBody.base_tree = treeSha;
+      // Create tree - use base_tree to preserve any existing files not in our list
+      const treeBody: { base_tree?: string; tree: typeof treeItems } = { tree: treeItems };
+      if (baseTreeSha) treeBody.base_tree = baseTreeSha;
+
       const newTreeRes = await connectors.proxy("github", `/repos/${owner}/${repoName}/git/trees`, {
         method: "POST",
         body: JSON.stringify(treeBody),
         headers: { "Content-Type": "application/json" },
       });
-      const newTree = await newTreeRes.json() as { sha?: string; message?: string };
+      const newTreeText = await newTreeRes.text();
+      let newTree: { sha?: string; message?: string };
+      try { newTree = JSON.parse(newTreeText); } catch { newTree = { message: newTreeText.substring(0, 100) }; }
       if (newTreeRes.status !== 201 || !newTree.sha) {
         console.error("Tree creation failed:", newTreeRes.status, newTree);
         return res.status(500).json({ error: "Failed to create tree", details: newTree });
@@ -264,12 +283,217 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         success: true,
         url: `https://github.com/${owner}/${repoName}`,
-        filesCount: filesToPush.length,
+        filesCount: allFiles.length,
+        textFiles: textFilesToPush.length,
+        binaryFiles: binaryFilesToPush.length,
         commit: newCommit.sha,
       });
     } catch (error) {
       console.error("GitHub push error:", error);
       res.status(500).json({ error: "Failed to push to GitHub", details: String(error) });
+    }
+  });
+
+  // GitHub: build static site and deploy directly to gh-pages branch
+  app.post("/api/github/setup-and-deploy", async (req, res) => {
+    // Set a long timeout for this response
+    req.setTimeout(300000);
+    res.setTimeout(300000);
+
+    try {
+      const connectors = new ReplitConnectors();
+      const { execSync } = await import("child_process");
+
+      const userRes = await connectors.proxy("github", "/user", { method: "GET" });
+      const user = await userRes.json() as { login: string };
+      const owner = user.login;
+      const repoName = "storycard";
+
+      // Check repo exists
+      const repoCheck = await connectors.proxy("github", `/repos/${owner}/${repoName}`, { method: "GET" });
+      if (repoCheck.status === 404) {
+        return res.status(400).json({ error: "storycard 저장소가 없습니다. 먼저 '소스 저장'을 눌러주세요." });
+      }
+
+      // Build the static site
+      const root = process.cwd();
+      try {
+        execSync("node build-static.js", { cwd: root, timeout: 120000, stdio: "pipe" });
+      } catch (buildError) {
+        return res.status(500).json({ error: "빌드 실패", details: String(buildError) });
+      }
+
+      // Collect all built files from dist/
+      const distDir = path.join(root, "dist");
+      const distFiles: { path: string; content: Buffer }[] = [];
+
+      function collectDist(dir: string, base: string) {
+        let entries: fs.Dirent[];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          const relPath = base ? `${base}/${entry.name}` : entry.name;
+          if (entry.isDirectory()) {
+            collectDist(fullPath, relPath);
+          } else {
+            distFiles.push({ path: relPath, content: fs.readFileSync(fullPath) });
+          }
+        }
+      }
+      collectDist(distDir, "");
+
+      // Create blobs for all dist files
+      const treeItems: { path: string; mode: string; type: string; sha: string }[] = [];
+      for (const file of distFiles) {
+        const base64Content = file.content.toString("base64");
+        const blobRes = await connectors.proxy("github", `/repos/${owner}/${repoName}/git/blobs`, {
+          method: "POST",
+          body: JSON.stringify({ content: base64Content, encoding: "base64" }),
+          headers: { "Content-Type": "application/json" },
+        });
+        const blobText = await blobRes.text();
+        let blob: { sha?: string; message?: string };
+        try { blob = JSON.parse(blobText); } catch { blob = { message: blobText.substring(0, 100) }; }
+        if (blobRes.status !== 201 || !blob.sha) {
+          return res.status(500).json({ error: "블롭 생성 실패", file: file.path, details: blob });
+        }
+        treeItems.push({ path: file.path, mode: "100644", type: "blob", sha: blob.sha });
+      }
+
+      // Create tree (no base_tree - fresh gh-pages content)
+      const treeRes = await connectors.proxy("github", `/repos/${owner}/${repoName}/git/trees`, {
+        method: "POST",
+        body: JSON.stringify({ tree: treeItems }),
+        headers: { "Content-Type": "application/json" },
+      });
+      const treeText = await treeRes.text();
+      let newTree: { sha?: string; message?: string };
+      try { newTree = JSON.parse(treeText); } catch { newTree = { message: treeText.substring(0, 100) }; }
+      if (treeRes.status !== 201 || !newTree.sha) {
+        return res.status(500).json({ error: "트리 생성 실패", details: newTree });
+      }
+
+      // Create orphan commit
+      const commitRes = await connectors.proxy("github", `/repos/${owner}/${repoName}/git/commits`, {
+        method: "POST",
+        body: JSON.stringify({
+          message: "deploy: 배포 빌드 업데이트",
+          tree: newTree.sha,
+          parents: [],
+        }),
+        headers: { "Content-Type": "application/json" },
+      });
+      const newCommit = await commitRes.json() as { sha?: string; message?: string };
+      if (commitRes.status !== 201 || !newCommit.sha) {
+        return res.status(500).json({ error: "커밋 생성 실패", details: newCommit });
+      }
+
+      // Create or update gh-pages branch
+      const ghPagesRef = await connectors.proxy("github", `/repos/${owner}/${repoName}/git/ref/heads/gh-pages`, { method: "GET" });
+      let branchRes;
+      if (ghPagesRef.status === 200) {
+        branchRes = await connectors.proxy("github", `/repos/${owner}/${repoName}/git/refs/heads/gh-pages`, {
+          method: "PATCH",
+          body: JSON.stringify({ sha: newCommit.sha, force: true }),
+          headers: { "Content-Type": "application/json" },
+        });
+      } else {
+        branchRes = await connectors.proxy("github", `/repos/${owner}/${repoName}/git/refs`, {
+          method: "POST",
+          body: JSON.stringify({ ref: "refs/heads/gh-pages", sha: newCommit.sha }),
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (branchRes.status !== 200 && branchRes.status !== 201) {
+        const branchData = await branchRes.json();
+        return res.status(500).json({ error: "브랜치 설정 실패", details: branchData });
+      }
+
+      // Enable/update GitHub Pages to use gh-pages branch
+      // Try POST first (create), if 409 (already exists), use PUT (update)
+      const pagesPost = await connectors.proxy("github", `/repos/${owner}/${repoName}/pages`, {
+        method: "POST",
+        body: JSON.stringify({ source: { branch: "gh-pages", path: "/" } }),
+        headers: { "Content-Type": "application/json" },
+      });
+      if (pagesPost.status === 409) {
+        // Already exists, update it
+        await connectors.proxy("github", `/repos/${owner}/${repoName}/pages`, {
+          method: "PUT",
+          body: JSON.stringify({ source: { branch: "gh-pages", path: "/" } }),
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const pagesUrl = `https://${owner}.github.io/${repoName}/`;
+
+      res.json({
+        success: true,
+        pagesUrl,
+        filesCount: distFiles.length,
+        commit: newCommit.sha,
+        message: "빌드 파일이 GitHub Pages에 직접 배포되었습니다. 1~2분 후 사이트가 활성화됩니다.",
+      });
+    } catch (error) {
+      console.error("Setup and deploy error:", error);
+      res.status(500).json({ error: "배포 실패", details: String(error) });
+    }
+  });
+
+  // GitHub: trigger GitHub Actions workflow to build and deploy to gh-pages
+  app.post("/api/github/deploy-pages", async (req, res) => {
+    try {
+      const connectors = new ReplitConnectors();
+
+      const userRes = await connectors.proxy("github", "/user", { method: "GET" });
+      const user = await userRes.json() as { login: string };
+      const owner = user.login;
+      const repoName = "storycard";
+
+      // Check repo exists
+      const checkRes = await connectors.proxy("github", `/repos/${owner}/${repoName}`, { method: "GET" });
+      if (checkRes.status === 404) {
+        return res.status(400).json({ error: "storycard 저장소가 없습니다. 먼저 소스 저장을 눌러주세요." });
+      }
+
+      // Check workflow file exists on main branch
+      const wfCheck = await connectors.proxy("github", `/repos/${owner}/${repoName}/contents/.github/workflows/deploy.yml`, { method: "GET" });
+      if (wfCheck.status === 404) {
+        return res.status(400).json({ error: "워크플로우 파일이 없습니다. 먼저 소스 저장을 눌러주세요." });
+      }
+
+      // Trigger workflow_dispatch on the deploy.yml workflow
+      const triggerRes = await connectors.proxy("github", `/repos/${owner}/${repoName}/actions/workflows/deploy.yml/dispatches`, {
+        method: "POST",
+        body: JSON.stringify({ ref: "main" }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (triggerRes.status !== 204) {
+        const triggerBody = await triggerRes.json();
+        console.error("Workflow trigger failed:", triggerRes.status, triggerBody);
+        return res.status(500).json({ error: "워크플로우 실행 실패", details: triggerBody });
+      }
+
+      // Enable GitHub Pages source (best effort)
+      await connectors.proxy("github", `/repos/${owner}/${repoName}/pages`, {
+        method: "POST",
+        body: JSON.stringify({ source: { branch: "gh-pages", path: "/" } }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const pagesUrl = `https://${owner}.github.io/${repoName}`;
+      const actionsUrl = `https://github.com/${owner}/${repoName}/actions`;
+
+      res.json({
+        success: true,
+        pagesUrl,
+        actionsUrl,
+        message: "GitHub Actions 워크플로우가 시작되었습니다. 2~3분 후 Pages가 활성화됩니다.",
+      });
+    } catch (error) {
+      console.error("Deploy pages error:", error);
+      res.status(500).json({ error: "배포 실패", details: String(error) });
     }
   });
 

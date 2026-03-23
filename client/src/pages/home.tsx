@@ -28,7 +28,9 @@ export default function Home() {
   const [currentUseRealPhotos, setCurrentUseRealPhotos] = useState(true);
   const [currentUseIllustrations, setCurrentUseIllustrations] = useState(true);
   const [isPushing, setIsPushing] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
   const [repoUrl, setRepoUrl] = useState<string | null>(null);
+  const [pagesUrl, setPagesUrl] = useState<string | null>(null);
   const { toast } = useToast();
   const flippedCards = cards.filter(card => card.flipped);
 
@@ -58,6 +60,41 @@ export default function Home() {
       });
     } finally {
       setIsPushing(false);
+    }
+  };
+
+  const [actionsUrl, setActionsUrl] = useState<string | null>(null);
+
+  const handleGithubDeploy = async () => {
+    setIsDeploying(true);
+    toast({
+      title: '배포 준비 중...',
+      description: '빌드 및 GitHub Pages 업로드 중입니다. 약 1~2분 소요됩니다.',
+    });
+    try {
+      const res = await fetch('/api/github/setup-and-deploy', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setPagesUrl(data.pagesUrl);
+        toast({
+          title: 'GitHub Pages 배포 완료!',
+          description: `${data.filesCount || ''}개 파일이 업로드되었습니다. 1~2분 후 활성화됩니다.`,
+        });
+      } else {
+        toast({
+          title: '배포 실패',
+          description: data.error || '알 수 없는 오류가 발생했습니다.',
+          variant: 'destructive',
+        });
+      }
+    } catch (e) {
+      toast({
+        title: '오류',
+        description: '서버에 연결할 수 없습니다.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeploying(false);
     }
   };
 
@@ -113,7 +150,7 @@ export default function Home() {
   const getIllustrationImage = (usedImages: Set<string>): string => {
     // 일러스트 이미지들을 동적으로 import
   const getIllustrationUrl = (index: number): string => {
-    return new URL(`../assets/illustration${index}.png`, import.meta.url).href;
+    return new URL(`../assets/illustration${index}.jpg`, import.meta.url).href;
   };
 
   const illustrations = Array.from({ length: 37 }, (_, i) => getIllustrationUrl(i + 1));
@@ -190,21 +227,36 @@ export default function Home() {
     <div className="bg-gradient-to-br from-pastel-sky via-pastel-yellow to-pastel-purple min-h-screen font-noto">
       {/* Header */}
       <header className="text-center py-8 px-4 relative">
-        {/* GitHub push button - top right */}
+        {/* GitHub buttons - top right */}
         <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
-          <Button
-            onClick={handleGithubPush}
-            disabled={isPushing}
-            className="bg-gray-900 hover:bg-gray-700 text-white flex items-center gap-2"
-            size="sm"
-          >
-            {isPushing ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <SiGithub className="w-4 h-4" />
-            )}
-            {isPushing ? '업로드 중...' : 'GitHub 저장'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleGithubPush}
+              disabled={isPushing || isDeploying}
+              className="bg-gray-900 hover:bg-gray-700 text-white flex items-center gap-2"
+              size="sm"
+            >
+              {isPushing ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <SiGithub className="w-4 h-4" />
+              )}
+              {isPushing ? '저장 중...' : '소스 저장'}
+            </Button>
+            <Button
+              onClick={handleGithubDeploy}
+              disabled={isPushing || isDeploying}
+              className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
+              size="sm"
+            >
+              {isDeploying ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ExternalLink className="w-4 h-4" />
+              )}
+              {isDeploying ? '배포 중...' : 'Pages 배포'}
+            </Button>
+          </div>
           {repoUrl && (
             <a
               href={repoUrl}
@@ -214,6 +266,28 @@ export default function Home() {
             >
               <ExternalLink className="w-3 h-3" />
               storycard 저장소 보기
+            </a>
+          )}
+          {actionsUrl && (
+            <a
+              href={actionsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-orange-600 hover:text-orange-800 flex items-center gap-1 underline"
+            >
+              <ExternalLink className="w-3 h-3" />
+              Actions 빌드 확인
+            </a>
+          )}
+          {pagesUrl && (
+            <a
+              href={pagesUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1 underline font-semibold"
+            >
+              <ExternalLink className="w-3 h-3" />
+              GitHub Pages에서 열기
             </a>
           )}
         </div>
