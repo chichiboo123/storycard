@@ -2,6 +2,13 @@ import { useState } from 'react';
 import CardGenerator from '@/components/card-generator';
 import StoryWriter from '@/components/story-writer';
 
+// 파일을 추가하기만 하면 자동으로 인식 (코드 수정 불필요)
+const illustrationModules = import.meta.glob<string>(
+  '../assets/illustration*.jpg',
+  { eager: true, query: '?url', import: 'default' }
+);
+const ALL_ILLUSTRATIONS = Object.values(illustrationModules);
+
 function adjustBrightness(color: string, amount: number): string {
   const hex = color.replace('#', '');
   const r = Math.max(0, Math.min(255, parseInt(hex.substr(0, 2), 16) + amount));
@@ -75,23 +82,11 @@ export default function Home() {
   };
 
   const getIllustrationImage = (usedImages: Set<string>): string => {
-    // 일러스트 이미지들을 동적으로 import
-  const getIllustrationUrl = (index: number): string => {
-    return new URL(`../assets/illustration${index}.jpg`, import.meta.url).href;
-  };
-
-  const illustrations = Array.from({ length: 37 }, (_, i) => getIllustrationUrl(i + 1));
-    
-    // 사용되지 않은 일러스트만 필터링
-    const availableIllustrations = illustrations.filter(img => !usedImages.has(img));
-    
-    // 사용 가능한 일러스트가 없다면 전체 목록에서 선택
-    const sourceList = availableIllustrations.length > 0 ? availableIllustrations : illustrations;
-    const randomIndex = Math.floor(Math.random() * sourceList.length);
-    const selectedImage = sourceList[randomIndex];
-    
-    usedImages.add(selectedImage);
-    return selectedImage;
+    const available = ALL_ILLUSTRATIONS.filter(img => !usedImages.has(img));
+    const sourceList = available.length > 0 ? available : ALL_ILLUSTRATIONS;
+    const selected = sourceList[Math.floor(Math.random() * sourceList.length)];
+    usedImages.add(selected);
+    return selected;
   };
 
   const getRandomImage = async (usedImages: Set<string>): Promise<string> => {
