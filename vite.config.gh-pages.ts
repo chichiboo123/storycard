@@ -16,5 +16,5 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist"),
     emptyOutDir: true,
   },
-  base: "/storycard/",
+  base: "/",  // 커스텀 도메인 사용 시 루트 경로
 });
