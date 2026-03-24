@@ -1,10 +1,6 @@
 import { useState } from 'react';
 import CardGenerator from '@/components/card-generator';
 import StoryWriter from '@/components/story-writer';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { SiGithub } from 'react-icons/si';
-import { Loader2, ExternalLink } from 'lucide-react';
 
 function adjustBrightness(color: string, amount: number): string {
   const hex = color.replace('#', '');
@@ -27,76 +23,7 @@ export default function Home() {
   const [usedImages, setUsedImages] = useState(new Set<string>());
   const [currentUseRealPhotos, setCurrentUseRealPhotos] = useState(true);
   const [currentUseIllustrations, setCurrentUseIllustrations] = useState(true);
-  const [isPushing, setIsPushing] = useState(false);
-  const [isDeploying, setIsDeploying] = useState(false);
-  const [repoUrl, setRepoUrl] = useState<string | null>(null);
-  const [pagesUrl, setPagesUrl] = useState<string | null>(null);
-  const { toast } = useToast();
   const flippedCards = cards.filter(card => card.flipped);
-
-  const handleGithubPush = async () => {
-    setIsPushing(true);
-    try {
-      const res = await fetch('/api/github/push', { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        setRepoUrl(data.url);
-        toast({
-          title: 'GitHub 업로드 완료!',
-          description: `${data.filesCount}개 파일이 storycard 저장소에 저장되었습니다.`,
-        });
-      } else {
-        toast({
-          title: '업로드 실패',
-          description: data.error || '알 수 없는 오류가 발생했습니다.',
-          variant: 'destructive',
-        });
-      }
-    } catch (e) {
-      toast({
-        title: '오류',
-        description: '서버에 연결할 수 없습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsPushing(false);
-    }
-  };
-
-  const [actionsUrl, setActionsUrl] = useState<string | null>(null);
-
-  const handleGithubDeploy = async () => {
-    setIsDeploying(true);
-    toast({
-      title: '배포 준비 중...',
-      description: '빌드 및 GitHub Pages 업로드 중입니다. 약 1~2분 소요됩니다.',
-    });
-    try {
-      const res = await fetch('/api/github/setup-and-deploy', { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        setPagesUrl(data.pagesUrl);
-        toast({
-          title: 'GitHub Pages 배포 완료!',
-          description: `${data.filesCount || ''}개 파일이 업로드되었습니다. 1~2분 후 활성화됩니다.`,
-        });
-      } else {
-        toast({
-          title: '배포 실패',
-          description: data.error || '알 수 없는 오류가 발생했습니다.',
-          variant: 'destructive',
-        });
-      }
-    } catch (e) {
-      toast({
-        title: '오류',
-        description: '서버에 연결할 수 없습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsDeploying(false);
-    }
-  };
 
   const handleCardFlip = async (id: number) => {
     const cardToFlip = cards.find(card => card.id === id);
@@ -227,71 +154,6 @@ export default function Home() {
     <div className="bg-gradient-to-br from-pastel-sky via-pastel-yellow to-pastel-purple min-h-screen font-noto">
       {/* Header */}
       <header className="text-center py-8 px-4 relative">
-        {/* GitHub buttons - top right */}
-        <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
-          <div className="flex gap-2">
-            <Button
-              onClick={handleGithubPush}
-              disabled={isPushing || isDeploying}
-              className="bg-gray-900 hover:bg-gray-700 text-white flex items-center gap-2"
-              size="sm"
-            >
-              {isPushing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <SiGithub className="w-4 h-4" />
-              )}
-              {isPushing ? '저장 중...' : '소스 저장'}
-            </Button>
-            <Button
-              onClick={handleGithubDeploy}
-              disabled={isPushing || isDeploying}
-              className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
-              size="sm"
-            >
-              {isDeploying ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <ExternalLink className="w-4 h-4" />
-              )}
-              {isDeploying ? '배포 중...' : 'Pages 배포'}
-            </Button>
-          </div>
-          {repoUrl && (
-            <a
-              href={repoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 underline"
-            >
-              <ExternalLink className="w-3 h-3" />
-              storycard 저장소 보기
-            </a>
-          )}
-          {actionsUrl && (
-            <a
-              href={actionsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-orange-600 hover:text-orange-800 flex items-center gap-1 underline"
-            >
-              <ExternalLink className="w-3 h-3" />
-              Actions 빌드 확인
-            </a>
-          )}
-          {pagesUrl && (
-            <a
-              href={pagesUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1 underline font-semibold"
-            >
-              <ExternalLink className="w-3 h-3" />
-              GitHub Pages에서 열기
-            </a>
-          )}
-        </div>
-
         {/* Little Prince inspired stars decoration */}
         <div className="flex justify-center mb-4">
           <div className="text-2xl">⭐</div>
@@ -328,44 +190,19 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white/80 backdrop-blur-sm mt-12 py-8 px-4">
-        <div className="container mx-auto text-center">
-          <div className="mb-4">
-            <p className="font-noto text-gray-600 mb-2">
-              실물사진 출처:{' '}
-              <a
-                href="https://picsum.photos/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:text-purple-500 underline transition-colors duration-200"
-              >
-                https://picsum.photos/
-              </a>
-            </p>
-          </div>
-          
-          <div className="border-t border-gray-200 pt-4">
-            <p className="font-do-hyeon text-lg text-gray-700">
-              created by.{' '}
-              <a
-                href="https://litt.ly/chichiboo"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-purple-500 hover:text-blue-500 transition-colors duration-200 underline"
-              >
-                교육뮤지컬 꿈꾸는 치수쌤
-              </a>
-            </p>
-          </div>
-          
-          {/* Little Prince inspired decoration */}
-          <div className="mt-4 flex justify-center space-x-2 text-lg">
-            <span>🌹</span>
-            <span>🦊</span>
-            <span>✈️</span>
-            <span>🌍</span>
-            <span>⭐</span>
-          </div>
+      <footer className="bg-white/80 backdrop-blur-sm mt-12 py-3 px-4">
+        <div className="container mx-auto flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
+          <span className="font-noto text-gray-600">
+            실물사진 출처:{' '}
+            <a href="https://picsum.photos/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-purple-500 underline transition-colors duration-200">picsum.photos</a>
+          </span>
+          <span className="text-gray-300">|</span>
+          <span className="font-do-hyeon text-gray-700">
+            created by.{' '}
+            <a href="https://litt.ly/chichiboo" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:text-blue-500 transition-colors duration-200 underline">교육뮤지컬 꿈꾸는 치수쌤</a>
+          </span>
+          <span className="text-gray-300">|</span>
+          <span className="space-x-1">🌹🦊✈️🌍⭐</span>
         </div>
       </footer>
     </div>

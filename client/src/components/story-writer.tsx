@@ -47,6 +47,30 @@ export default function StoryWriter({ flippedCards, onRemoveCard }: StoryWriterP
     }
   };
 
+  const handleCopyClipboard = async () => {
+    if (!storyText.trim()) {
+      toast({
+        title: "오류",
+        description: "이야기를 먼저 작성해주세요.",
+        variant: "destructive"
+      });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(storyText);
+      toast({
+        title: "복사 완료",
+        description: "클립보드에 복사되었습니다!"
+      });
+    } catch (error) {
+      toast({
+        title: "오류",
+        description: "클립보드 복사에 실패했습니다.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleDownloadJpg = async () => {
     if (!storyText.trim()) {
       toast({
@@ -144,6 +168,20 @@ export default function StoryWriter({ flippedCards, onRemoveCard }: StoryWriterP
               TXT 다운로드
             </button>
             
+            <button
+              onClick={handleCopyClipboard}
+              disabled={!storyText.trim()}
+              className={`
+                px-6 py-3 rounded-lg font-noto transition-all duration-200
+                ${!storyText.trim()
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-yellow-300 hover:bg-yellow-400 text-gray-800 shadow-lg hover:shadow-xl transform hover:scale-105'
+                }
+              `}
+            >
+              클립보드 복사
+            </button>
+
             <button
               onClick={handleDownloadJpg}
               disabled={!storyText.trim()}
