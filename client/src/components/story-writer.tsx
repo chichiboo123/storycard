@@ -155,20 +155,6 @@ export default function StoryWriter({ flippedCards, onRemoveCard }: StoryWriterP
         <div className="story-section">
           <div className="flex flex-col sm:flex-row gap-4 justify-center download-buttons">
             <button
-              onClick={handleDownloadTxt}
-              disabled={!storyText.trim()}
-              className={`
-                px-6 py-3 rounded-lg font-noto transition-all duration-200
-                ${!storyText.trim()
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                  : 'bg-green-300 hover:bg-green-400 text-gray-800 shadow-lg hover:shadow-xl transform hover:scale-105'
-                }
-              `}
-            >
-              TXT 다운로드
-            </button>
-            
-            <button
               onClick={handleCopyClipboard}
               disabled={!storyText.trim()}
               className={`
@@ -180,6 +166,20 @@ export default function StoryWriter({ flippedCards, onRemoveCard }: StoryWriterP
               `}
             >
               클립보드 복사
+            </button>
+
+            <button
+              onClick={handleDownloadTxt}
+              disabled={!storyText.trim()}
+              className={`
+                px-6 py-3 rounded-lg font-noto transition-all duration-200
+                ${!storyText.trim()
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-green-300 hover:bg-green-400 text-gray-800 shadow-lg hover:shadow-xl transform hover:scale-105'
+                }
+              `}
+            >
+              TXT 다운로드
             </button>
 
             <button

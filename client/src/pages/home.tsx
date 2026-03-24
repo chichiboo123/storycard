@@ -151,7 +151,7 @@ export default function Home() {
   };
 
   return (
-    <div className="bg-gradient-to-br from-pastel-sky via-pastel-yellow to-pastel-purple min-h-screen font-noto">
+    <div className="bg-gradient-to-br from-pastel-sky via-pastel-yellow to-pastel-purple min-h-screen font-noto flex flex-col">
       {/* Header */}
       <header className="text-center py-8 px-4 relative">
         {/* Little Prince inspired stars decoration */}
@@ -172,7 +172,7 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 max-w-6xl">
+      <main className="container mx-auto px-4 max-w-6xl flex-1">
         <CardGenerator 
           onCardsGenerated={handleCardsGenerated}
           cards={cards}
@@ -201,8 +201,6 @@ export default function Home() {
             created by.{' '}
             <a href="https://litt.ly/chichiboo" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:text-blue-500 transition-colors duration-200 underline">교육뮤지컬 꿈꾸는 치수쌤</a>
           </span>
-          <span className="text-gray-300">|</span>
-          <span className="space-x-1">🌹🦊✈️🌍⭐</span>
         </div>
       </footer>
     </div>
